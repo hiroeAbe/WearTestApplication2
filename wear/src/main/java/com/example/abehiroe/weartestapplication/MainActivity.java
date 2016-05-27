@@ -21,18 +21,27 @@ import com.google.android.gms.wearable.Wearable;
 import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.CountDownLatch;
 
-public class MainActivity extends WearableActivity implements SensorEventListener{
+public class MainActivity extends WearableActivity implements SensorEventListener {
 
     private static final SimpleDateFormat AMBIENT_DATE_FORMAT =
             new SimpleDateFormat("HH:mm", Locale.US);
+
     private GoogleApiClient mGoogleApiClient;
     private BoxInsetLayout mContainerView;
     private TextView mTextView;
     private TextView hateTextView;
-    //private TextView mClockView;
+    private TextView mClockView;
     private SensorManager sensorManager;
+    float heartRate;
     private String TAG_WEAR = "WEAR";
+    public static int cntTouch;
+    private static final int SENSOR_TYPE_HEARTRATE = 65538;
+    private Sensor mHeartRateSensor;
+
+    private CountDownLatch latch;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -40,11 +49,21 @@ public class MainActivity extends WearableActivity implements SensorEventListene
         setAmbientEnabled();
         setupGoogleApiClient();
         sendMessage("massage");
+
         mContainerView = (BoxInsetLayout) findViewById(R.id.container);
-       // mTextView = (TextView) findViewById(R.id.text);
-        hateTextView = (TextView) findViewById(R.id.text);
-        /*mClockView = (TextView) findViewById(R.id.clock);*/
-        sensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
+        // mTextView = (TextView) findViewById(R.id.text);
+        hateTextView = (TextView) findViewById(R.id.hateTextView);
+        //mClockView = (TextView) findViewById(R.id.clock);
+
+        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        mHeartRateSensor = sensorManager.getDefaultSensor(65538);
+        //mHeartRateSensor = sensorManager.getDefaultSensor(Sensor.TYPE_HEART_RATE);
+        sensorManager.registerListener(this, mHeartRateSensor, SensorManager.SENSOR_DELAY_NORMAL);
+        Log.d(TAG_WEAR, "heat rate: " + heartRate);
+
+        if (mHeartRateSensor == null)
+            Log.d(TAG_WEAR, "heart rate sensor is null");
+
     }
 
     private void setupGoogleApiClient() {
@@ -54,6 +73,7 @@ public class MainActivity extends WearableActivity implements SensorEventListene
                     public void onConnected(Bundle connectionHint) {
                         //接続が完了した時
                     }
+
                     @Override
                     public void onConnectionSuspended(int cause) {
                         //一時的に切断された時
@@ -95,17 +115,24 @@ public class MainActivity extends WearableActivity implements SensorEventListene
                 return null;
             }
         }.execute(message);
+        Log.d(TAG_WEAR, "massage");
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        List<Sensor> sensors = sensorManager.getSensorList(Sensor.TYPE_HEART_RATE);
+        List<Sensor> sensors = sensorManager.getSensorList(65538);
         if (sensors.size() > 0) {
             Sensor s = sensors.get(0);
             sensorManager.registerListener(this, s, SensorManager.SENSOR_DELAY_UI);
         }
-
+       /* List<Sensor> sensors = sensorManager.getSensorList(Sensor.TYPE_HEART_RATE);
+        if (sensors.size() > 0) {
+            Sensor s = sensors.get(0);
+            sensorManager.registerListener(this, s, SensorManager.SENSOR_DELAY_UI);
+        }*/
+        Log.d(TAG_WEAR, "heat rate1: " + heartRate);
+        sendMessage("aa");
     }
 
     @Override
@@ -114,14 +141,25 @@ public class MainActivity extends WearableActivity implements SensorEventListene
         sensorManager.unregisterListener(this);
     }
 
+
+
     @Override
     public void onSensorChanged(SensorEvent event) {
-        if (event.sensor.getType() == Sensor.TYPE_HEART_RATE) {
-            float heartRate = event.values[0];
-            Log.d(TAG_WEAR, "heat rate: " + heartRate);
+      if (event.sensor.getType() == 65538) {
+            heartRate = event.values[0];
+            Log.d(TAG_WEAR, "heat rate2: " + heartRate);
 
         }
-    }
+
+        /*if (event.sensor.getType() == Sensor.TYPE_HEART_RATE) {
+            heartRate = event.values[0];
+            Log.d(TAG_WEAR, "heat rate2: " + heartRate);
+
+        }*/
+
+     }
+
+
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
@@ -158,5 +196,7 @@ public class MainActivity extends WearableActivity implements SensorEventListene
            // mTextView.setTextColor(getResources().getColor(android.R.color.black));
           //  mClockView.setVisibility(View.GONE);
         }
+        //hateTextView.setText((int) heartRate);
+        Log.d(TAG_WEAR, "heat rate3: " + heartRate);
     }
 }
