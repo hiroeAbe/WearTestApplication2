@@ -37,8 +37,9 @@ public class MainActivity extends WearableActivity implements SensorEventListene
     float heartRate;
     private String TAG_WEAR = "WEAR";
     public static int cntTouch;
-    private static final int SENSOR_TYPE_HEARTRATE = 65538;
+    //private static final int SENSOR_TYPE_HEARTRATE = 65538;
     private Sensor mHeartRateSensor;
+    //private Sensor availableSensor;
 
     private CountDownLatch latch;
 
@@ -53,13 +54,14 @@ public class MainActivity extends WearableActivity implements SensorEventListene
         mContainerView = (BoxInsetLayout) findViewById(R.id.container);
         // mTextView = (TextView) findViewById(R.id.text);
         hateTextView = (TextView) findViewById(R.id.hateTextView);
-        //mClockView = (TextView) findViewById(R.id.clock);
+
 
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-        mHeartRateSensor = sensorManager.getDefaultSensor(65538);
+        mHeartRateSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         //mHeartRateSensor = sensorManager.getDefaultSensor(Sensor.TYPE_HEART_RATE);
         sensorManager.registerListener(this, mHeartRateSensor, SensorManager.SENSOR_DELAY_NORMAL);
         Log.d(TAG_WEAR, "heat rate: " + heartRate);
+
 
         if (mHeartRateSensor == null)
             Log.d(TAG_WEAR, "heart rate sensor is null");
@@ -121,16 +123,15 @@ public class MainActivity extends WearableActivity implements SensorEventListene
     @Override
     protected void onResume() {
         super.onResume();
-        List<Sensor> sensors = sensorManager.getSensorList(65538);
+        List<Sensor> sensors = sensorManager.getSensorList(Sensor.TYPE_ACCELEROMETER);
+
         if (sensors.size() > 0) {
             Sensor s = sensors.get(0);
-            sensorManager.registerListener(this, s, SensorManager.SENSOR_DELAY_UI);
+            Log.d(TAG_WEAR,"hello"+s.getName());
+            sensorManager.registerListener(this, s, SensorManager.SENSOR_DELAY_NORMAL);
         }
-       /* List<Sensor> sensors = sensorManager.getSensorList(Sensor.TYPE_HEART_RATE);
-        if (sensors.size() > 0) {
-            Sensor s = sensors.get(0);
-            sensorManager.registerListener(this, s, SensorManager.SENSOR_DELAY_UI);
-        }*/
+        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+
         Log.d(TAG_WEAR, "heat rate1: " + heartRate);
         sendMessage("aa");
     }
@@ -145,18 +146,11 @@ public class MainActivity extends WearableActivity implements SensorEventListene
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-      if (event.sensor.getType() == 65538) {
+      if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
             heartRate = event.values[0];
             Log.d(TAG_WEAR, "heat rate2: " + heartRate);
 
         }
-
-        /*if (event.sensor.getType() == Sensor.TYPE_HEART_RATE) {
-            heartRate = event.values[0];
-            Log.d(TAG_WEAR, "heat rate2: " + heartRate);
-
-        }*/
-
      }
 
 
