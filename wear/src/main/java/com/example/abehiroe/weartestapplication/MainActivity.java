@@ -1,14 +1,14 @@
 package com.example.abehiroe.weartestapplication;
 
+import android.app.Activity;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.os.AsyncTask;
 import android.os.Bundle;
-import android.support.wearable.activity.WearableActivity;
-import android.support.wearable.view.BoxInsetLayout;
+import android.support.wearable.view.WatchViewStub;
 import android.util.Log;
+import android.view.WindowManager;
 import android.widget.TextView;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -18,179 +18,150 @@ import com.google.android.gms.wearable.MessageApi;
 import com.google.android.gms.wearable.NodeApi;
 import com.google.android.gms.wearable.Wearable;
 
-import java.text.SimpleDateFormat;
-import java.util.List;
-import java.util.Locale;
-import java.util.concurrent.CountDownLatch;
+public class MainActivity extends Activity implements SensorEventListener{
+    private final String TAG = MainActivity.class.getName();
+    private final float GAIN = 0.9f;
+    private final String[] SEND_MESSAGES = {"/Action/NONE", "/Action/PUNCH", "/Action/UPPER", "/Action/HOOK"};
 
-public class MainActivity extends WearableActivity implements SensorEventListener {
-
-    private static final SimpleDateFormat AMBIENT_DATE_FORMAT =
-            new SimpleDateFormat("HH:mm", Locale.US);
-
-    private GoogleApiClient mGoogleApiClient;
-    private BoxInsetLayout mContainerView;
     private TextView mTextView;
-    private TextView hateTextView;
-    private TextView mClockView;
-    private SensorManager sensorManager;
-    float heartRate;
-    private String TAG_WEAR = "WEAR";
-    public static int cntTouch;
-    //private static final int SENSOR_TYPE_HEARTRATE = 65538;
-    private Sensor mHeartRateSensor;
-    //private Sensor availableSensor;
-
-    private CountDownLatch latch;
+    private SensorManager mSensorManager;
+    private GoogleApiClient mGoogleApiClient;
+    private String mNode;
+    private float x,y,z;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        setAmbientEnabled();
-        setupGoogleApiClient();
-        sendMessage("massage");
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
-        mContainerView = (BoxInsetLayout) findViewById(R.id.container);
-        // mTextView = (TextView) findViewById(R.id.text);
-        hateTextView = (TextView) findViewById(R.id.hateTextView);
+        final WatchViewStub stub = (WatchViewStub) findViewById(R.id.watch_view_stub);
+        stub.setOnLayoutInflatedListener(new WatchViewStub.OnLayoutInflatedListener() {
+            @Override
+            public void onLayoutInflated(WatchViewStub stub) {
+                mTextView = (TextView) stub.findViewById(R.id.text);
+            }
+        });
 
+        mSensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
 
-        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-        mHeartRateSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        //mHeartRateSensor = sensorManager.getDefaultSensor(Sensor.TYPE_HEART_RATE);
-        sensorManager.registerListener(this, mHeartRateSensor, SensorManager.SENSOR_DELAY_NORMAL);
-        Log.d(TAG_WEAR, "heat rate: " + heartRate);
-
-
-        if (mHeartRateSensor == null)
-            Log.d(TAG_WEAR, "heart rate sensor is null");
-
-    }
-
-    private void setupGoogleApiClient() {
         mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addApi(Wearable.API)
                 .addConnectionCallbacks(new GoogleApiClient.ConnectionCallbacks() {
                     @Override
-                    public void onConnected(Bundle connectionHint) {
-                        //接続が完了した時
+                    public void onConnected(Bundle bundle) {
+                        Log.d(TAG, "onConnected");
+
+//                        NodeApi.GetConnectedNodesResult nodes = Wearable.NodeApi.getConnectedNodes(mGoogleApiClient).await();
+                        Wearable.NodeApi.getConnectedNodes(mGoogleApiClient).setResultCallback(new ResultCallback<NodeApi.GetConnectedNodesResult>() {
+                            @Override
+                            public void onResult(NodeApi.GetConnectedNodesResult nodes) {
+                                //Nodeは１個に限定
+                                if (nodes.getNodes().size() > 0) {
+                                    mNode = nodes.getNodes().get(0).getId();
+                                }
+                            }
+                        });
                     }
 
                     @Override
-                    public void onConnectionSuspended(int cause) {
-                        //一時的に切断された時
+                    public void onConnectionSuspended(int i) {
+                        Log.d(TAG, "onConnectionSuspended");
+
                     }
                 })
                 .addOnConnectionFailedListener(new GoogleApiClient.OnConnectionFailedListener() {
                     @Override
-                    public void onConnectionFailed(ConnectionResult result) {
-
+                    public void onConnectionFailed(ConnectionResult connectionResult) {
+                        Log.d(TAG, "onConnectionFailed : " + connectionResult.toString());
                     }
                 })
-                .addApi(Wearable.API)
                 .build();
-        mGoogleApiClient.connect();
-    }
-
-    private void sendMessage(String message) {
-        if (message == null) return;
-        new AsyncTask<String, Void, String>() {
-            @Override
-            protected String doInBackground(String... params) {
-                String message = params[0];
-                byte[] bytes;
-                try {
-                    bytes = message.getBytes("UTF-8");
-                } catch (Exception e) {
-                    return null;
-                }
-                NodeApi.GetConnectedNodesResult nodes = Wearable.NodeApi.getConnectedNodes(mGoogleApiClient).await();
-                for (com.google.android.gms.wearable.Node node : nodes.getNodes()) {
-                    Wearable.MessageApi.sendMessage(mGoogleApiClient, node.getId(), "/post/message", bytes)
-                            .setResultCallback(new ResultCallback<MessageApi.SendMessageResult>() {
-                                @Override
-                                public void onResult(MessageApi.SendMessageResult sendMessageResult) {
-                                    //sendMessageResult.toString();
-                                }
-                            });
-                }
-                return null;
-            }
-        }.execute(message);
-        Log.d(TAG_WEAR, "massage");
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        List<Sensor> sensors = sensorManager.getSensorList(Sensor.TYPE_ACCELEROMETER);
 
-        if (sensors.size() > 0) {
-            Sensor s = sensors.get(0);
-            Log.d(TAG_WEAR,"hello"+s.getName());
-            sensorManager.registerListener(this, s, SensorManager.SENSOR_DELAY_NORMAL);
-        }
-        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        Sensor sensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        mSensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL);
 
-        Log.d(TAG_WEAR, "heat rate1: " + heartRate);
-        sendMessage("aa");
+        mGoogleApiClient.connect();
     }
 
     @Override
-    protected void onStop() {
-        super.onStop();
-        sensorManager.unregisterListener(this);
+    protected void onPause() {
+        super.onPause();
+        mSensorManager.unregisterListener(this);
+        mGoogleApiClient.disconnect();
     }
-
-
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-      if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-            heartRate = event.values[0];
-            Log.d(TAG_WEAR, "heat rate2: " + heartRate);
+        if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+            x = (x * GAIN + event.values[0] * (1 - GAIN));
+            y = (y * GAIN + event.values[1] * (1 - GAIN));
+            z = (z * GAIN + event.values[2] * (1 - GAIN));
 
+            if (mTextView != null) mTextView.setText(String.format("X : %f\nY : %f\nZ : %f\n",x, y, z));
+
+            int motion;
+            motion = detectMotion(x, y, z);
+
+            if (motion > 0 && mNode != null ) {
+//                MessageApi.SendMessageResult result = Wearable.MessageApi.sendMessage(mGoogleApiClient, mNode, SEND_MESSAGES[motion], null).await();
+//                if (!result.getStatus().isSuccess()) {
+//                    Log.d(TAG, "ERROR : failed to send Message" + result.getStatus());
+//                }
+                Wearable.MessageApi.sendMessage(mGoogleApiClient, mNode, SEND_MESSAGES[motion], null).setResultCallback(new ResultCallback<MessageApi.SendMessageResult>() {
+                    @Override
+                    public void onResult(MessageApi.SendMessageResult result) {
+                        if (!result.getStatus().isSuccess()) {
+                            Log.d(TAG, "ERROR : failed to send Message" + result.getStatus());
+                        }
+                    }
+                });
+            }
         }
-     }
+    }
 
+    /**
+     * 超適当な判定
+     *
+     */
+    float ox,oy,oz;
+    int delay;
+    private int detectMotion(float x, float y, float z) {
+        int diffX = (int)((x - ox)*10);
+        int diffY = (int)((y - oy)*10);
+        int diffZ = (int)((z - oz)*10);
+        int motion = 0;
 
+        Log.d(TAG, "s:" + diffX + "/" + diffY + "/" + diffZ + " - " + (int)x + "/" + (int)y + "/" + (int)z);
+        if (Math.abs(diffZ) > 20) {
+            Log.d(TAG, "upper!");
+            motion = 2;
+            delay = 4;
+        } else if (Math.abs(diffY) > 20) {
+            Log.d(TAG, "hook!");
+            motion = 3;
+            delay = 4;
+        } else if (diffX > 10) {
+            if (delay == 0) {
+                Log.d(TAG, "punch!");
+                motion = 1;
+            }
+        }
+
+        if (delay > 0) delay--;
+        ox = x;
+        oy = y;
+        oz = z;
+        return motion;
+    }
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
 
-    }
-
-    @Override
-    public void onEnterAmbient(Bundle ambientDetails) {
-        super.onEnterAmbient(ambientDetails);
-        updateDisplay();
-    }
-
-    @Override
-    public void onUpdateAmbient() {
-        super.onUpdateAmbient();
-        updateDisplay();
-    }
-
-    @Override
-    public void onExitAmbient() {
-        updateDisplay();
-        super.onExitAmbient();
-    }
-
-    private void updateDisplay() {
-        if (isAmbient()) {
-            mContainerView.setBackgroundColor(getResources().getColor(android.R.color.black));
-           // mTextView.setTextColor(getResources().getColor(android.R.color.white));
-           // mClockView.setVisibility(View.VISIBLE);
-
-          //  mClockView.setText(AMBIENT_DATE_FORMAT.format(new Date()));
-        } else {
-            mContainerView.setBackground(null);
-           // mTextView.setTextColor(getResources().getColor(android.R.color.black));
-          //  mClockView.setVisibility(View.GONE);
-        }
-        //hateTextView.setText((int) heartRate);
-        Log.d(TAG_WEAR, "heat rate3: " + heartRate);
     }
 }
